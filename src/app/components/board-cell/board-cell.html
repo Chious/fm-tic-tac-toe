@@ -1,0 +1,32 @@
+<div class="w-full aspect-square">
+  <app-button
+    class="block w-full h-full"
+    [class.win-animation]="isWinning()"
+    [class.cursor-not-allowed]="!isEmpty"
+    [variant]="isWinning() ? (value() === 'X' ? 'secondary' : 'primary') : 'dark'"
+    size="cell"
+    (mouseenter)="isHovered.set(true)"
+    (mouseleave)="isHovered.set(false)"
+    (click)="handleClick()"
+  >
+    @if (value() === 'X') {
+      <img
+        [src]="isWinning() ? iconXOutline : iconX"
+        alt="x"
+        class="mx-auto w-10 h-10 sm:w-16 sm:h-16"
+      />
+    } @else if (value() === 'O') {
+      <img
+        [src]="isWinning() ? iconOOutline : iconO"
+        alt="o"
+        class="mx-auto w-10 h-10 sm:w-16 sm:h-16"
+      />
+    } @else if (isEmpty && isHovered()) {
+      <img
+        [src]="currentPlayer() === 'X' ? iconXOutline : iconOOutline"
+        [alt]="currentPlayer()"
+        class="mx-auto w-10 h-10 opacity-50 sm:w-16 sm:h-16"
+      />
+    }
+  </app-button>
+</div>

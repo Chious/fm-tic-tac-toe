@@ -17,6 +17,12 @@
   --color-teal-300: #65e9e4;
   --color-teal-400: #31c3bd;
 
+  /* Button shadow colors */
+  --color-amber-400-shadow: #cc8b13;
+  --color-teal-400-shadow: #118c87;
+  --color-slate-300-shadow: #6b8997;
+  --color-slate-800-shadow: #1a2a33;
+
   /* Spacing */
   --spacing-0: 0px;
   --spacing-100: 8px;
