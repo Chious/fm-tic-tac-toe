@@ -1,3 +1,97 @@
-/* You can add global styles to this file, and also import other style files */
+@import 'tailwindcss';
 
-@import "tailwindcss";
+@theme {
+  /* Colors */
+  --color-neutral-0: #ffffff;
+  --color-neutral-950: #000000;
+
+  --color-slate-100: #dbe8ed;
+  --color-slate-300: #a8bfc9;
+  --color-slate-800: #1f3641;
+  --color-slate-850: #21313b;
+  --color-slate-900: #1a2a33;
+
+  --color-amber-300: #ffc860;
+  --color-amber-400: #f2b137;
+
+  --color-teal-300: #65e9e4;
+  --color-teal-400: #31c3bd;
+
+  /* Spacing */
+  --spacing-0: 0px;
+  --spacing-100: 8px;
+  --spacing-150: 12px;
+  --spacing-200: 16px;
+  --spacing-250: 20px;
+  --spacing-300: 24px;
+  --spacing-375: 30px;
+  --spacing-500: 40px;
+
+  /* Corner Radius */
+  --radius-0: 0px;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-10: 10px;
+  --radius-16: 16px;
+
+  /* Fonts */
+  --font-outfit: 'Outfit', sans-serif;
+}
+
+/* Typography Presets 
+  Tailwind v4 uses @utility to define custom utility classes.
+*/
+@utility text-preset-1 {
+  font-family: var(--font-outfit);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  line-height: 50px;
+  text-transform: uppercase;
+}
+
+@utility text-preset-2 {
+  font-family: var(--font-outfit);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  line-height: 30px;
+  text-transform: uppercase;
+}
+
+@utility text-preset-3 {
+  font-family: var(--font-outfit);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1.25px;
+  line-height: 25px;
+  text-transform: uppercase;
+}
+
+@utility text-preset-4 {
+  font-family: var(--font-outfit);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 20px;
+  text-transform: uppercase;
+}
+
+/* Renamed slightly from "text-preset-5(bold)" to be a valid CSS/HTML class name */
+@utility text-preset-5 {
+  font-family: var(--font-outfit);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.9px;
+  line-height: 18.2px;
+  text-transform: none;
+}
+
+@utility text-preset-6 {
+  font-family: var(--font-outfit);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.75px;
+  line-height: 15px;
+  text-transform: none;
+}
