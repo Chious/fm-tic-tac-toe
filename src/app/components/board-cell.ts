@@ -46,9 +46,9 @@ import { Mark } from '@app/services/game-service';
   styleUrl: './board-cell.css',
 })
 export class BoardCell {
-  value = input.required<Mark>();
+  value = input<Mark | ''>('');
   isWinning = input<boolean>(false);
-  currentPlayer = input.required<Mark>();
+  currentPlayer = input<Mark>('X');
 
   cellClick = output<void>();
 

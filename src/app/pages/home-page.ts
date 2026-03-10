@@ -23,11 +23,11 @@ import { GameService, Mark } from '@app/services/game-service';
         </span>
       </div>
 
-      <app-button variant="primary" size="lg" class="w-full"
-        ><a [routerLink]="['/game/single']">New Game (VS CPU)</a></app-button
+      <app-button variant="primary" size="lg" class="w-full" [routerLink]="['/game/single']"
+        >New Game (VS CPU)</app-button
       >
-      <app-button variant="secondary" size="lg" class="w-full"
-        ><a [routerLink]="['/game/multi/123']">New Game (VS Player)</a></app-button
+      <app-button variant="secondary" size="lg" class="w-full" [routerLink]="['/game/multi/123']"
+        >New Game (VS Player)</app-button
       >
     </section>
   `,

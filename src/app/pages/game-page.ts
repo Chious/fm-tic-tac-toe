@@ -1,12 +1,16 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import iconLogo from '@assets/logo.svg';
 import iconO from '@assets/icon-o.svg';
 import iconX from '@assets/icon-x.svg';
 import iconReset from '@assets/icon-restart.svg';
 import { BoardCell } from '@app/components/board-cell';
 import { Button } from '@app/components/button';
-import { GameService } from '@app/services/game-service';
+import { GameService, GameState, INITIAL_BOARD } from '@app/services/game-service';
 import { Dialog } from '@app/components/dialog';
+import { ActivatedRoute, Router } from '@angular/router';
+import { GameModeStrategy } from '@app/strategies/game-mode.strategy';
+import { SinglePlayerStrategy } from '@app/strategies/single-player.strategy';
+import { MultiplayerStrategy } from '@app/strategies/multiplayer.stragegy';
 
 type StatKey = 'X' | 'O' | 'Tie';
 interface GameStat {
@@ -15,12 +19,25 @@ interface GameStat {
   score: number;
 }
 
+const INITIAL_GAME_STATE: GameState = {
+  board: INITIAL_BOARD,
+  startingPlayer: 'X',
+  currentPlayer: 'X',
+  gameStatus: null,
+  gameStats: { X: 0, O: 0, Tie: 0 },
+};
+
 @Component({
   selector: 'app-game-page',
   imports: [BoardCell, Button, Dialog],
   template: `
     @if (isGameOver()) {
-      <app-dialog></app-dialog>
+      <app-dialog
+        [gameStatus]="gameStatus()!"
+        [playerMark]="playerState().mark"
+        (nextTurn)="onNextTurn()"
+        (quit)="onQuit()"
+      />
     }
 
     <main
@@ -30,11 +47,17 @@ interface GameStat {
         <img class="game-logo" [src]="iconLogo" alt="logo" class="h-full w-auto" />
 
         <app-button variant="dark" disabled>
-          <img [src]="iconX" alt="x" width="24" height="24" />
+          @if (currentPlayer() === 'X') {
+            <img [src]="iconX" alt="x" width="24" height="24" />
+          } @else if (currentPlayer() === 'O') {
+            <img [src]="iconO" alt="o" width="24" height="24" />
+          } @else {
+            <span>?</span>
+          }
           <span class="game-turn-text uppercase text-preset-4 text-slate-300 ml-2">Turn</span>
         </app-button>
 
-        <app-button variant="silver" size="icon"
+        <app-button variant="silver" size="icon" (click)="resetGame()"
           ><img [src]="iconReset" alt="reset" width="24" height="24"
         /></app-button>
       </header>
@@ -51,11 +74,6 @@ interface GameStat {
           }
         }
       </div>
-      <!-- TODO(game-over-dialog): 遊戲結束時顯示 Dialog
-    - 顯示贏家（X 贏 / O 贏 / 平局）及對應文字（You Won! / You Lost! / Draw!）
-    - 提供「下一輪」按鈕：保留 gameStats 分數，僅重置棋盤與 currentPlayer
-    - 提供「返回選單」按鈕：完整 reset，導回 /
-  -->
       <footer class="game-stats flex items-center justify-between gap-4 w-full">
         @for (stat of gameStats(); track stat.key) {
           <div
@@ -76,27 +94,56 @@ interface GameStat {
     </main>
   `,
 })
-export class GamePage {
+export class GamePage implements OnInit, OnDestroy {
   iconLogo = iconLogo;
   iconO = iconO;
   iconX = iconX;
   iconReset = iconReset;
 
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private gameService = inject(GameService);
 
-  playerState = this.gameService.getPlayerState();
-  private gameState = this.gameService.getGameState();
+  private strategySignal = signal<GameModeStrategy | null>(null);
 
+  private gameState = computed(() => this.strategySignal()?.getGameState()() ?? INITIAL_GAME_STATE);
+  playerState = computed(() => this.strategySignal()?.getPlayerState()() ?? { mark: '' as const });
+
+  gameStatus = computed(() => this.gameState().gameStatus);
   board = computed(() => this.gameState().board);
   currentPlayer = computed(() => this.gameState().currentPlayer);
+  isGameOver = computed(() => this.gameStatus() !== null);
 
-  isGameOver = signal<boolean>(false); //TODO: compute by gameService
+  async ngOnInit() {
+    const roomId = this.route.snapshot.paramMap.get('roomId');
+
+    const strategy = roomId
+      ? new MultiplayerStrategy(roomId)
+      : new SinglePlayerStrategy(this.gameService, 'hard');
+
+    await strategy.init();
+    this.strategySignal.set(strategy);
+  }
+
+  ngOnDestroy() {
+    this.strategySignal()?.destroy();
+  }
+
+  onNextTurn() {
+    this.strategySignal()?.onNextTurn();
+  }
+
+  onQuit() {
+    this.strategySignal()?.onReset();
+    this.router.navigate(['/']);
+  }
+
+  resetGame() {
+    this.strategySignal()?.onReset();
+  }
 
   placeMarker(row: number, col: number) {
-    // TODO(bot-logic): 單人模式下，若非玩家回合（currentPlayer !== playerState.mark）則忽略點擊
-    // TODO(multiplayer): 多人模式下，改為透過 Colyseus WebSocket 傳送落子事件，不直接呼叫 gameService
-    this.gameService.placeMarker(row, col);
-    // TODO(bot-logic): 單人模式下，落子後若遊戲未結束，觸發 CPU 自動落子（Minimax 或隨機）
+    this.strategySignal()?.onPlayerMove(row, col);
   }
 
   gameStats = computed<GameStat[]>(() => {
