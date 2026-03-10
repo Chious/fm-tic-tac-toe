@@ -8,6 +8,7 @@ import {
   createEndpoint,
 } from 'colyseus';
 
+import basicAuth from 'express-basic-auth';
 import { TicTacToeRoom } from './rooms/TicTacToeRoom.js';
 
 const server = defineServer({
@@ -28,7 +29,14 @@ const server = defineServer({
   }),
 
   express: (app) => {
-    app.use('/monitor', monitor());
+    const basicAuthMiddleware = basicAuth({
+      users: {
+        'admin': process.env.MONITOR_PASSWORD || 'default_secret_password' 
+      },
+      challenge: true,
+    });
+
+    app.use('/monitor', basicAuthMiddleware, monitor());
 
     if (process.env.NODE_ENV !== 'production') {
       app.use('/', playground());

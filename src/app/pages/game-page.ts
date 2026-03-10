@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import iconLogo from '@assets/logo.svg';
 import iconO from '@assets/icon-o.svg';
 import iconX from '@assets/icon-x.svg';
@@ -31,6 +32,55 @@ const INITIAL_GAME_STATE: GameState = {
   selector: 'app-game-page',
   imports: [BoardCell, Button, Dialog],
   template: `
+    @if (isWaitingForOpponent()) {
+      <app-dialog [isShouldShowCollapseButton]="false">
+        <ng-container header>
+          <h3 class="mb-1 text-preset-4 font-bold text-white">Waiting for Opponent</h3>
+          <p class="text-slate-400 text-sm">Share the link with a friend to start the game!</p>
+        </ng-container>
+
+        <ng-container content>
+          <div class="flex items-center justify-center gap-8 py-4">
+            <!-- Player 1 slot — already joined -->
+            <div class="flex flex-col items-center gap-2">
+              <div class="rounded-xl bg-slate-700 p-4 ring-2 ring-teal-400">
+                <img
+                  [src]="playerState().mark === 'O' ? iconO : iconX"
+                  alt="you"
+                  width="40"
+                  height="40"
+                />
+              </div>
+              <span class="text-xs font-semibold text-teal-400 uppercase tracking-wide">You</span>
+            </div>
+
+            <span class="text-lg font-bold text-slate-500">VS</span>
+
+            <!-- Player 2 slot — waiting -->
+            <div class="flex flex-col items-center gap-2 opacity-35">
+              <div class="rounded-xl bg-slate-700 p-4">
+                <img
+                  [src]="playerState().mark === 'O' ? iconX : iconO"
+                  alt="opponent"
+                  width="40"
+                  height="40"
+                  class="blur-sm"
+                />
+              </div>
+              <span
+                class="animate-pulse text-xs font-semibold text-slate-400 uppercase tracking-wide"
+                >Waiting…</span
+              >
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container footer>
+          <app-button variant="silver" (click)="onQuit()">Leave</app-button>
+        </ng-container>
+      </app-dialog>
+    }
+
     @if (isGameOver()) {
       <app-dialog [isShouldShowCollapseButton]="true">
         <ng-container header>
@@ -70,7 +120,7 @@ const INITIAL_GAME_STATE: GameState = {
       <header class="game-toolbar flex items-center justify-between w-full">
         <img [src]="iconLogo" alt="logo" width="72" height="32" />
 
-        <app-button variant="dark" disabled>
+        <app-button variant="dark" [disabled]="true">
           @if (currentPlayer() === 'X') {
             <img [src]="iconX" alt="x" width="24" height="24" />
           } @else if (currentPlayer() === 'O') {
@@ -127,6 +177,7 @@ export class GamePage implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private gameService = inject(GameService);
+  private platformId = inject(PLATFORM_ID);
 
   private strategySignal = signal<GameModeStrategy | null>(null);
 
@@ -138,7 +189,13 @@ export class GamePage implements OnInit, OnDestroy {
   currentPlayer = computed(() => this.gameState().currentPlayer);
   isGameOver = computed(() => this.gameStatus() !== null);
 
+  isMultiplayer = computed(() => !!this.route.snapshot.paramMap.get('roomId'));
+  playerCount = computed(() => this.strategySignal()?.getPlayerCount?.()() ?? 2);
+  isWaitingForOpponent = computed(() => this.isMultiplayer() && this.playerCount() < 2);
+
   async ngOnInit() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
     const roomId = this.route.snapshot.paramMap.get('roomId');
     const difficulty = (this.route.snapshot.queryParamMap.get('difficulty') ?? 'hard') as
       | 'easy'
@@ -177,12 +234,12 @@ export class GamePage implements OnInit, OnDestroy {
   gameStats = computed<GameStat[]>(() => {
     const { gameStats } = this.gameState();
     const playerMark = this.playerState().mark;
-    const cpuMark = playerMark === 'X' ? 'O' : 'X';
+    const opponentLabel = this.isMultiplayer() ? 'P2' : 'CPU';
 
     return [
-      { key: 'X', label: `X (${playerMark === 'X' ? 'You' : 'CPU'})`, score: gameStats.X },
+      { key: 'X', label: `X (${playerMark === 'X' ? 'You' : opponentLabel})`, score: gameStats.X },
       { key: 'Tie', label: 'Ties', score: gameStats.Tie },
-      { key: 'O', label: `O (${cpuMark === 'O' ? 'CPU' : 'You'})`, score: gameStats.O },
+      { key: 'O', label: `O (${playerMark === 'O' ? 'You' : opponentLabel})`, score: gameStats.O },
     ];
   });
 }

@@ -1,14 +1,7 @@
 import { Signal, signal } from '@angular/core';
-import { Client, Room } from 'colyseus.js';
-import {
-  GameState,
-  INITIAL_BOARD,
-  Mark,
-  PlayerState,
-} from '@app/services/game-service';
+import { Client, Room } from '@colyseus/sdk';
+import { GameState, INITIAL_BOARD, Mark, PlayerState } from '@app/services/game-service';
 import { GameModeStrategy } from './game-mode.strategy';
-
-const COLYSEUS_SERVER_URL = 'ws://localhost:2567';
 
 const INITIAL_GAME_STATE: GameState = {
   board: INITIAL_BOARD,
@@ -35,33 +28,35 @@ const INITIAL_PLAYER_STATE: PlayerState = { mark: 'X' };
 export class MultiplayerStrategy implements GameModeStrategy {
   private _gameState = signal<GameState>(INITIAL_GAME_STATE);
   private _playerState = signal<PlayerState>(INITIAL_PLAYER_STATE);
+  private _playerCount = signal<number>(0);
 
-  // TODO(multiplayer): 替換成實際 Colyseus Client
-  // private client = new Client(COLYSEUS_SERVER_URL);
-  // private room?: Room;
+  private client = new Client(import.meta.env['NG_APP_COLYSEUS_WS_URL']);
+  private room?: Room;
 
   constructor(private roomId: string) {}
 
   async init(): Promise<void> {
-    // TODO(multiplayer): 連接 Colyseus 房間（用 joinById，roomId 由 POST /api/game 取得）
-    // this.room = await this.client.joinById(this.roomId);
+    try {
+      this.room = await this.client.joinById(this.roomId);
 
-    // TODO(multiplayer): 接收 server 推送的 playerState（加入後確定自己的 mark）
-    // this.room.onMessage('playerState', (state: PlayerState) => {
-    //   this._playerState.set(state);
-    // });
+      this.room.onMessage('playerState', (state: PlayerState) => {
+        this._playerState.set(state);
+      });
 
-    // TODO(multiplayer): 接收 server Schema 自動同步，轉換 flat board → 2D + gameStatus
-    // this.room.onStateChange((serverState) => {
-    //   this._gameState.set(this.toGameState(serverState));
-    // });
+      this.room.onStateChange((serverState: any) => {
+        this._gameState.set(this.toGameState(serverState));
+        this._playerCount.set(serverState.players.size);
+      });
 
-    console.warn(`[MultiplayerStrategy] roomId=${this.roomId} — Colyseus not yet connected`);
+      console.warn(`[MultiplayerStrategy] roomId=${this.roomId} — Colyseus connected`);
+    } catch (e) {
+      console.error(`[MultiplayerStrategy] Error joining room ${this.roomId}:`, e);
+      // Optional: Handle UI notification or redirect user to home
+    }
   }
 
   destroy(): void {
-    // TODO(multiplayer): 離開房間
-    // this.room?.leave();
+    this.room?.leave();
   }
 
   getGameState(): Signal<GameState> {
@@ -72,40 +67,35 @@ export class MultiplayerStrategy implements GameModeStrategy {
     return this._playerState.asReadonly();
   }
 
+  getPlayerCount(): Signal<number> {
+    return this._playerCount.asReadonly();
+  }
+
   onPlayerMove(row: number, col: number): void {
-    // TODO(multiplayer): 傳送落子給 server，等待 onStateChange 更新畫面
-    // this.room?.send('move', { row, col });
+    this.room?.send('move', { row, col });
   }
 
   onNextTurn(): void {
-    // TODO(multiplayer): 通知 server 進入下一輪
-    // this.room?.send('next-turn');
+    this.room?.send('next-turn');
   }
 
   onReset(): void {
-    // TODO(multiplayer): 通知 server 重置房間
-    // this.room?.send('reset');
+    this.room?.send('reset');
   }
 
-  // TODO(multiplayer): 將 Colyseus Schema state 轉換為 Angular GameState
-  // Server state 差異：
-  //   - board 是 flat ArraySchema<string>[9]，需重組為 Mark[][]
-  //   - gameStatus 是 string（'' 代表 null）
-  //   - stats 欄位為 statsX / statsO / statsTie
-  //
-  // private toGameState(serverState: { ... }): GameState {
-  //   const flat = Array.from(serverState.board) as Mark[];
-  //   const board: Mark[][] = [
-  //     [flat[0], flat[1], flat[2]],
-  //     [flat[3], flat[4], flat[5]],
-  //     [flat[6], flat[7], flat[8]],
-  //   ];
-  //   return {
-  //     board,
-  //     startingPlayer: serverState.startingPlayer as Mark,
-  //     currentPlayer: serverState.currentPlayer as Mark,
-  //     gameStatus: serverState.gameStatus === '' ? null : serverState.gameStatus as 'X' | 'O' | 'draw',
-  //     gameStats: { X: serverState.statsX, O: serverState.statsO, Tie: serverState.statsTie },
-  //   };
-  // }
+  private toGameState(serverState: any): GameState {
+    const flat = Array.from(serverState.board) as Mark[];
+    const board: Mark[][] = [
+      [flat[0], flat[1], flat[2]],
+      [flat[3], flat[4], flat[5]],
+      [flat[6], flat[7], flat[8]],
+    ];
+    return {
+      board,
+      startingPlayer: serverState.startingPlayer as Mark,
+      currentPlayer: serverState.currentPlayer as Mark,
+      gameStatus: serverState.gameStatus === '' ? null : (serverState.gameStatus as any),
+      gameStats: { X: serverState.statsX, O: serverState.statsO, Tie: serverState.statsTie },
+    };
+  }
 }

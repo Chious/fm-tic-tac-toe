@@ -13,6 +13,7 @@ export interface GameModeStrategy {
 
   getGameState(): Signal<GameState>;
   getPlayerState(): Signal<PlayerState>;
+  getPlayerCount?(): Signal<number>;
 
   onPlayerMove(row: number, col: number): void;
   onNextTurn(): void;

@@ -7,7 +7,7 @@ export type ButtonSize = 'lg' | 'sm' | 'icon' | 'cell';
   selector: 'app-button',
   imports: [],
   template: `
-    <button [class]="buttonClasses()">
+    <button [class]="buttonClasses()" [disabled]="disabled()">
       <ng-content />
     </button>
   `,
@@ -16,6 +16,7 @@ export class Button {
   variant = input<ButtonVariant>('primary');
   size = input<ButtonSize>('lg');
   selected = input<boolean>(false);
+  disabled = input<boolean>(false);
 
   buttonClasses = computed(() => {
     const v = this.variant();
@@ -77,6 +78,10 @@ export class Button {
 
     if (this.selected()) {
       classes += 'outline-2 outline-white outline-offset-2 ';
+    }
+
+    if (this.disabled()) {
+      classes += 'opacity-50 cursor-not-allowed pointer-events-none ';
     }
 
     return classes.trim();
