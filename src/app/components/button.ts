@@ -6,8 +6,11 @@ export type ButtonSize = 'lg' | 'sm' | 'icon' | 'cell';
 @Component({
   selector: 'app-button',
   imports: [],
-  templateUrl: './button.html',
-  styleUrl: './button.css',
+  template: `
+    <button [class]="buttonClasses()">
+      <ng-content />
+    </button>
+  `,
 })
 export class Button {
   variant = input<ButtonVariant>('primary');
