@@ -53,14 +53,6 @@ describe('SinglePlayerStrategy', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('calls setStartingPlayer with the player mark', () => {
-      gameService.setPlayerMark('O');
-      const spy = vi.spyOn(gameService, 'setStartingPlayer');
-      const strategy = buildStrategy();
-      strategy.init();
-      expect(spy).toHaveBeenCalledWith('O');
-    });
-
     it('restores stats from localStorage when playerMark matches', () => {
       gameService.setPlayerMark('X');
       const stored = { playerMark: 'X', gameStats: { X: 3, O: 1, Tie: 2 } };

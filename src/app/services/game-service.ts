@@ -79,6 +79,10 @@ export class GameService {
     this._gameState.update((s) => ({ ...s, gameStats }));
   }
 
+  restoreGameState(state: GameState) {
+    this._gameState.set(state);
+  }
+
   setProcessing(value: boolean) {
     this.isProcessing.set(value);
   }

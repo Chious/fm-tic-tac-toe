@@ -1,17 +1,20 @@
 import { Signal } from '@angular/core';
-import { GameService, GameState, GameStats, PlayerState } from '@app/services/game-service';
+import { GameService, GameState, Mark, PlayerState } from '@app/services/game-service';
 import { Difficulty, getMove } from '@app/utils/bot';
 import { GameModeStrategy } from './game-mode.strategy';
 
-const STORAGE_KEY = 'fm-ttt:single-player:stats';
+const STORAGE_KEY = 'fm-ttt:single-player:v2';
 
 type PersistedState = {
-  playerMark: string;
-  gameStats: GameStats;
+  playerMark: Mark;
+  gameState: GameState;
 };
 
 export class SinglePlayerStrategy implements GameModeStrategy {
   private isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+  // Arrow function stored as property so the same reference can be removed later
+  private readonly onBeforeUnload = () => this.saveState();
 
   constructor(
     private gameService: GameService,
@@ -20,21 +23,27 @@ export class SinglePlayerStrategy implements GameModeStrategy {
 
   init(): void {
     const playerMark = this.gameService.getPlayerState()().mark;
+    this.loadState();
 
-    this.gameService.setStartingPlayer(playerMark);
-    this.loadStats();
+    if (this.isBrowser) {
+      window.addEventListener('beforeunload', this.onBeforeUnload);
+    }
 
-    // If bot holds the first turn, kick off its move immediately
-    if (this.gameService.getGameState()().currentPlayer !== playerMark) {
+    // If it is the bot's turn (either fresh start or restored mid-game), kick off its move
+    const { currentPlayer, gameStatus } = this.gameService.getGameState()();
+    if (gameStatus === null && currentPlayer !== playerMark) {
       this.onBotMove();
     }
   }
 
   destroy(): void {
-    this.saveStats();
+    if (this.isBrowser) {
+      window.removeEventListener('beforeunload', this.onBeforeUnload);
+    }
+    this.saveState();
   }
 
-  private loadStats(): void {
+  private loadState(): void {
     if (!this.isBrowser) return;
 
     try {
@@ -44,21 +53,22 @@ export class SinglePlayerStrategy implements GameModeStrategy {
       const saved = JSON.parse(raw) as PersistedState;
       const playerMark = this.gameService.getPlayerState()().mark;
 
+      // Discard save if the player switched mark since last session
       if (saved.playerMark !== playerMark) return;
 
-      this.gameService.restoreStats(saved.gameStats);
+      this.gameService.restoreGameState(saved.gameState);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
 
-  private saveStats(): void {
+  private saveState(): void {
     if (!this.isBrowser) return;
 
-    const { gameStats } = this.gameService.getGameState()();
+    const gameState = this.gameService.getGameState()();
     const playerMark = this.gameService.getPlayerState()().mark;
 
-    const data: PersistedState = { playerMark, gameStats };
+    const data: PersistedState = { playerMark, gameState };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
 

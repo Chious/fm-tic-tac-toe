@@ -32,19 +32,43 @@ const INITIAL_GAME_STATE: GameState = {
   imports: [BoardCell, Button, Dialog],
   template: `
     @if (isGameOver()) {
-      <app-dialog
-        [gameStatus]="gameStatus()!"
-        [playerMark]="playerState().mark"
-        (nextTurn)="onNextTurn()"
-        (quit)="onQuit()"
-      />
+      <app-dialog [isShouldShowCollapseButton]="true">
+        <ng-container header>
+          @if (gameStatus() === 'draw') {
+            <h3 class="mb-2 text-preset-4 font-bold text-white">It's a Draw!</h3>
+          } @else if (gameStatus() === playerState().mark) {
+            <h3 class="mb-2 text-preset-4 font-bold text-white">You Won!</h3>
+          } @else {
+            <h3 class="mb-2 text-preset-4 font-bold text-white">You Lost!</h3>
+          }
+        </ng-container>
+
+        <ng-container content>
+          <div class="text-preset-1 text-teal-400 flex items-center justify-center gap-2">
+            @if (gameStatus() === 'X') {
+              <img [src]="iconX" alt="x" width="64" height="64" />
+              <h2 class="text-preset-1">Takes the round</h2>
+            } @else if (gameStatus() === 'O') {
+              <img [src]="iconO" alt="o" width="64" height="64" />
+              <h2 class="text-preset-1">Takes the round</h2>
+            } @else if (gameStatus() === 'draw') {
+              <span>Draw</span>
+            }
+          </div>
+        </ng-container>
+
+        <ng-container footer>
+          <app-button variant="silver" (click)="onQuit()"> Quit </app-button>
+          <app-button variant="secondary" (click)="onNextTurn()"> Next Round </app-button>
+        </ng-container>
+      </app-dialog>
     }
 
     <main
       class="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-4 px-6 py-8 sm:max-w-md"
     >
       <header class="game-toolbar flex items-center justify-between w-full">
-        <img class="game-logo" [src]="iconLogo" alt="logo" class="h-full w-auto" />
+        <img [src]="iconLogo" alt="logo" width="72" height="32" />
 
         <app-button variant="dark" disabled>
           @if (currentPlayer() === 'X') {
@@ -116,13 +140,17 @@ export class GamePage implements OnInit, OnDestroy {
 
   async ngOnInit() {
     const roomId = this.route.snapshot.paramMap.get('roomId');
+    const difficulty = (this.route.snapshot.queryParamMap.get('difficulty') ?? 'hard') as
+      | 'easy'
+      | 'medium'
+      | 'hard';
 
     const strategy = roomId
       ? new MultiplayerStrategy(roomId)
-      : new SinglePlayerStrategy(this.gameService, 'hard');
+      : new SinglePlayerStrategy(this.gameService, difficulty);
 
-    await strategy.init();
     this.strategySignal.set(strategy);
+    await strategy.init();
   }
 
   ngOnDestroy() {

@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import {
   AngularNodeAppEngine,
   createNodeRequestHandler,
@@ -9,9 +12,19 @@ import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
+const allowedHost = process.env['ALLOWED_HOST'] || 'localhost';
+
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+app.use((req, res, next) => {
+  if (allowedHost.includes(req.hostname)) {
+    next();
+  } else {
+    console.warn(`[Security] Blocked request from unauthorized host: ${req.hostname}`);
+    res.status(403).send('Forbidden: Invalid Host Domain');
+  }
+});
 /**
  * Serve static files from /browser
  */

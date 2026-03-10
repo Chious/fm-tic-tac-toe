@@ -15,6 +15,7 @@ export type ButtonSize = 'lg' | 'sm' | 'icon' | 'cell';
 export class Button {
   variant = input<ButtonVariant>('primary');
   size = input<ButtonSize>('lg');
+  selected = input<boolean>(false);
 
   buttonClasses = computed(() => {
     const v = this.variant();
@@ -72,6 +73,10 @@ export class Button {
         classes +=
           'shadow-[0_4px_0_0_var(--color-slate-800-shadow)] active:shadow-[0_0px_0_0_var(--color-slate-800-shadow)] active:translate-y-[4px] ';
       }
+    }
+
+    if (this.selected()) {
+      classes += 'outline-2 outline-white outline-offset-2 ';
     }
 
     return classes.trim();
