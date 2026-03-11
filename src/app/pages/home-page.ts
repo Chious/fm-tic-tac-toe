@@ -190,6 +190,12 @@ import { QRCodeComponent } from 'angularx-qrcode';
         (click)="onPlayerVsPlayer()"
         >{{ isCreatingRoom() ? 'Creating Room…' : 'New Game (VS Player)' }}</app-button
       >
+
+      @if (serverError()) {
+        <p class="mt-1 rounded-md bg-red-900/60 px-4 py-2 text-center text-sm text-red-300 ring-1 ring-red-600">
+          {{ serverError() }}
+        </p>
+      }
     </section>
   `,
 })
@@ -210,6 +216,7 @@ export class HomePage {
 
   showWaitingDialog = signal(false);
   isCreatingRoom = signal(false);
+  serverError = signal<string | null>(null);
   shareUrl = signal('');
   copySuccess = signal(false);
   private multiplayerRoomId = signal<string | null>(null);
@@ -227,6 +234,7 @@ export class HomePage {
 
   onPlayerVsPlayer() {
     this.isCreatingRoom.set(true);
+    this.serverError.set(null);
     this.http
       .post<{ roomId: string }>(`${import.meta.env['NG_APP_COLYSEUS_HTTP_URL']}/api/game`, {})
       .pipe(finalize(() => this.isCreatingRoom.set(false)))
@@ -241,6 +249,7 @@ export class HomePage {
         },
         error: (err) => {
           console.error('Failed to create multiplayer game', err);
+          this.serverError.set('Could not reach the game server. Please check that it is running and try again.');
         },
       });
   }

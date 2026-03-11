@@ -62,11 +62,9 @@ export class MultiplayerStrategy implements GameModeStrategy {
         this._gameState.set(this.toGameState(serverState));
         this._playerCount.set(serverState.players.size);
       });
-
-      console.log(`[MultiplayerStrategy] Session ID:`, this.room?.sessionId);
     } catch (e) {
       console.error(`[MultiplayerStrategy] Error joining room ${this.roomId}:`, e);
-      // Optional: Handle UI notification or redirect user to home
+      throw e;
     }
   }
 

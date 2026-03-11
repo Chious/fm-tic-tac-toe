@@ -33,6 +33,23 @@ const INITIAL_GAME_STATE: GameState = {
   selector: 'app-game-page',
   imports: [BoardCell, Button, Dialog],
   template: `
+    @if (connectionError()) {
+      <app-dialog [isShouldShowCollapseButton]="false">
+        <ng-container header>
+          <h3 class="mb-1 text-preset-4 font-bold text-white">Connection Failed</h3>
+          <p class="text-slate-400 text-sm">Unable to reach the game server.</p>
+        </ng-container>
+
+        <ng-container content>
+          <p class="py-2 text-center text-sm text-slate-300">{{ connectionError() }}</p>
+        </ng-container>
+
+        <ng-container footer>
+          <app-button variant="secondary" (click)="onQuit()">Back to Home</app-button>
+        </ng-container>
+      </app-dialog>
+    }
+
     @if (isMultiplayer() && opponentCursor()) {
       <img
         [src]="cursorIcon"
@@ -249,6 +266,7 @@ export class GamePage implements OnInit, OnDestroy {
 
   waitingCountdown = signal(0);
   urgeCooldown = signal(0);
+  connectionError = signal<string | null>(null);
   private countdownTimer: ReturnType<typeof setInterval> | undefined;
   private urgeCooldownTimer: ReturnType<typeof setInterval> | undefined;
   private readonly mouseMoveHandler = (e: MouseEvent) =>
@@ -269,7 +287,7 @@ export class GamePage implements OnInit, OnDestroy {
 
   isMultiplayer = computed(() => !!this.route.snapshot.paramMap.get('roomId'));
   playerCount = computed(() => this.strategySignal()?.getPlayerCount?.()() ?? 2);
-  isWaitingForOpponent = computed(() => this.isMultiplayer() && this.playerCount() < 2);
+  isWaitingForOpponent = computed(() => this.isMultiplayer() && this.playerCount() < 2 && !this.connectionError());
   opponentCursor = computed(() => this.strategySignal()?.getOpponentCursor?.()() ?? null);
   isUrged = computed(() => this.strategySignal()?.getIsUrged?.()() ?? false);
 
@@ -287,7 +305,15 @@ export class GamePage implements OnInit, OnDestroy {
       : new SinglePlayerStrategy(this.gameService, difficulty);
 
     this.strategySignal.set(strategy);
-    await strategy.init();
+    try {
+      await strategy.init();
+    } catch (e) {
+      console.error('[GamePage] Strategy init failed:', e);
+      if (roomId) {
+        this.connectionError.set('Could not connect to the game server. The server may be offline or the room no longer exists.');
+      }
+      return;
+    }
 
     if (roomId) {
       document.addEventListener('mousemove', this.mouseMoveHandler);
