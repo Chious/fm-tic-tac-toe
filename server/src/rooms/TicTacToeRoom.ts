@@ -2,7 +2,9 @@ import { Room, Client } from '@colyseus/core';
 import { TicTacToeState, Player } from './schema/TicTacToeState.js';
 
 export class TicTacToeRoom extends Room<{ state: TicTacToeState }> {
-  maxClients = 2; // Strict 2-player limit
+  maxClients = 2;
+
+  private reconnectionTimer?: ReturnType<typeof setTimeout>;
 
   onCreate(options: any) {
     this.setState(new TicTacToeState());
@@ -44,8 +46,21 @@ export class TicTacToeRoom extends Room<{ state: TicTacToeState }> {
       }
     });
 
+    this.onMessage('requestPlayerState', (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player) client.send('playerState', { mark: player.mark });
+    });
+
     this.onMessage('reset', (client) => {
       this.resetGame();
+    });
+
+    this.onMessage('urge', (client) => {
+      this.broadcast('urge', { sessionId: client.sessionId }, { except: client });
+    });
+
+    this.onMessage('mouseMove', (client, data: { x: number; y: number }) => {
+      this.broadcast('mouseMove', { sessionId: client.sessionId, x: data.x, y: data.y }, { except: client });
     });
   }
 
@@ -67,55 +82,40 @@ export class TicTacToeRoom extends Room<{ state: TicTacToeState }> {
     // Tell the client what mark they are
     client.send('playerState', { mark: player.mark });
 
-    // Start the game when the room is full
+    // If a player joins while we were waiting for reconnection, cancel the timer and resume
     if (this.state.players.size === 2) {
+      if (this.reconnectionTimer) {
+        clearTimeout(this.reconnectionTimer);
+        this.reconnectionTimer = undefined;
+      }
+      this.state.disconnectionExpiration = 0;
+      this.state.gameStatus = '';
       this.state.isPlaying = true;
     }
   }
 
-  /**
-   * Unexpected drop (network loss, browser close, etc.).
-   * Pause the game and give the player 30 s to reconnect.
-   * If the window expires, end the game for the remaining player.
-   */
-  async onDrop(client: Client, code?: number) {
-    const player = this.state.players.get(client.sessionId);
-    if (player) {
-      player.connected = false;
-      this.state.isPlaying = false;
-    }
-
-    try {
-      await this.allowReconnection(client, 30);
-    } catch {
-      // Reconnection window expired — remove the player and end the game
-      this.state.players.delete(client.sessionId);
-      this.state.gameStatus = 'Opponent Disconnected';
-    }
-  }
-
-  /** Successful reconnect — restore the player and resume the game. */
-  onReconnect(client: Client) {
+  onLeave(client: Client) {
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
 
-    player.connected = true;
-
-    // Only resume if the game had not already ended before the drop
-    const allConnected = [...this.state.players.values()].every((p) => p.connected);
-    if (allConnected && !this.state.gameStatus) {
-      this.state.isPlaying = true;
-    }
-  }
-
-  /**
-   * Consented leave (client called room.leave()).
-   * Because onDrop is defined, this is only triggered for deliberate exits.
-   */
-  onLeave(client: Client, code?: number) {
     this.state.players.delete(client.sessionId);
     this.state.isPlaying = false;
-    this.state.gameStatus = 'Opponent Disconnected';
+
+    if (this.state.players.size === 0) return;
+
+    // Give 30 seconds for the player to rejoin (slot is now free — no server lock)
+    this.state.gameStatus = 'Waiting for Reconnection';
+    this.state.disconnectionExpiration = Date.now() + 30_000;
+
+    if (this.reconnectionTimer) clearTimeout(this.reconnectionTimer);
+
+    this.reconnectionTimer = setTimeout(() => {
+      this.reconnectionTimer = undefined;
+      if (this.state.players.size < 2) {
+        this.state.gameStatus = 'Opponent Disconnected';
+        this.state.disconnectionExpiration = 0;
+      }
+    }, 30_000);
   }
 
   private checkWin(mark: string): boolean {

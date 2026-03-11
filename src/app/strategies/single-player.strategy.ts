@@ -9,7 +9,15 @@ type PersistedState = {
   playerMark: Mark;
   gameState: GameState;
 };
-
+/**
+ * Single player strategy for the game mode.
+ * State is owned by the GameService and persisted in localStorage.
+ * GameService is the source of truth.
+ *
+ * @export
+ * @class SinglePlayerStrategy
+ * @implements {GameModeStrategy}
+ */
 export class SinglePlayerStrategy implements GameModeStrategy {
   private isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 

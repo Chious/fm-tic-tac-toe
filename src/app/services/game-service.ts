@@ -3,7 +3,7 @@ import { checkWin } from '@app/utils/game';
 
 export type Mark = 'X' | 'O' | '';
 
-export type GameStatus = 'X' | 'O' | 'draw' | null;
+export type GameStatus = 'X' | 'O' | 'draw' | 'Waiting for Reconnection' | 'Opponent Disconnected' | null;
 
 export const INITIAL_BOARD: Mark[][] = [
   ['', '', ''],
@@ -23,6 +23,7 @@ export type GameState = {
   currentPlayer: Mark;
   gameStatus: GameStatus;
   gameStats: GameStats;
+  disconnectionExpiration?: number;
 };
 
 export type PlayerState = {

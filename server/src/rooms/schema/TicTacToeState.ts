@@ -3,7 +3,6 @@ import { Schema, MapSchema, ArraySchema, type } from '@colyseus/schema';
 export class Player extends Schema {
   @type('string') mark: string = '';
   @type('string') sessionId: string = '';
-  @type('boolean') connected: boolean = true;
 }
 
 export class TicTacToeState extends Schema {
@@ -12,8 +11,10 @@ export class TicTacToeState extends Schema {
 
   @type('string') startingPlayer: string = 'X';
   @type('string') currentPlayer: string = 'X';
-  @type('string') gameStatus: string = ''; // 'X', 'O', 'draw', 'Opponent Disconnected', or empty string
+  @type('string') gameStatus: string = ''; // 'X', 'O', 'draw', 'Waiting for Reconnection', 'Opponent Disconnected', or empty string
   @type('boolean') isPlaying: boolean = false;
+
+  @type('number') disconnectionExpiration: number = 0;
 
   @type('number') statsX: number = 0;
   @type('number') statsO: number = 0;

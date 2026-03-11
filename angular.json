@@ -27,7 +27,8 @@
             ],
             "styles": ["src/styles.css"],
             "loader": {
-              ".svg": "dataurl"
+              ".svg": "dataurl",
+              ".png": "file"
             },
             "server": "src/main.server.ts",
             "outputMode": "server",

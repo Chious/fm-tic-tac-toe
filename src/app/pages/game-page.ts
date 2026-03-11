@@ -4,6 +4,7 @@ import iconLogo from '@assets/logo.svg';
 import iconO from '@assets/icon-o.svg';
 import iconX from '@assets/icon-x.svg';
 import iconReset from '@assets/icon-restart.svg';
+import cursorIcon from '@assets/cursor.png';
 import { BoardCell } from '@app/components/board-cell';
 import { Button } from '@app/components/button';
 import { GameService, GameState, INITIAL_BOARD } from '@app/services/game-service';
@@ -32,6 +33,24 @@ const INITIAL_GAME_STATE: GameState = {
   selector: 'app-game-page',
   imports: [BoardCell, Button, Dialog],
   template: `
+    @if (isMultiplayer() && opponentCursor()) {
+      <img
+        [src]="cursorIcon"
+        alt=""
+        class="pointer-events-none fixed z-50 w-6 h-6 opacity-30"
+        [style.left.px]="opponentCursor()!.x"
+        [style.top.px]="opponentCursor()!.y"
+      />
+    }
+
+    @if (isUrged()) {
+      <div
+        class="pointer-events-none fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-bounce rounded-full bg-amber-400 px-5 py-2 text-sm font-bold text-slate-900 shadow-lg"
+      >
+        ⚡ Your turn!
+      </div>
+    }
+
     @if (isWaitingForOpponent()) {
       <app-dialog [isShouldShowCollapseButton]="false">
         <ng-container header>
@@ -86,7 +105,9 @@ const INITIAL_GAME_STATE: GameState = {
         <ng-container header>
           @if (gameStatus() === 'draw') {
             <h3 class="mb-2 text-preset-4 font-bold text-white">It's a Draw!</h3>
-          } @else if (gameStatus() === playerState().mark) {
+          } @else if (
+            gameStatus() === playerState().mark || gameStatus() === 'Opponent Disconnected'
+          ) {
             <h3 class="mb-2 text-preset-4 font-bold text-white">You Won!</h3>
           } @else {
             <h3 class="mb-2 text-preset-4 font-bold text-white">You Lost!</h3>
@@ -94,13 +115,19 @@ const INITIAL_GAME_STATE: GameState = {
         </ng-container>
 
         <ng-container content>
-          <div class="text-preset-1 text-teal-400 flex items-center justify-center gap-2">
-            @if (gameStatus() === 'X') {
-              <img [src]="iconX" alt="x" width="64" height="64" />
-              <h2 class="text-preset-1">Takes the round</h2>
+          <div class="text-preset-1 text-teal-400 flex flex-col items-center justify-center gap-2">
+            @if (gameStatus() === 'Opponent Disconnected') {
+              <h2 class="text-preset-1 text-center text-teal-400">Opponent left the game</h2>
+            } @else if (gameStatus() === 'X') {
+              <div class="flex items-center gap-2">
+                <img [src]="iconX" alt="x" width="64" height="64" />
+                <h2>Takes the round</h2>
+              </div>
             } @else if (gameStatus() === 'O') {
-              <img [src]="iconO" alt="o" width="64" height="64" />
-              <h2 class="text-preset-1">Takes the round</h2>
+              <div class="flex items-center gap-2">
+                <img [src]="iconO" alt="o" width="64" height="64" />
+                <h2>Takes the round</h2>
+              </div>
             } @else if (gameStatus() === 'draw') {
               <span>Draw</span>
             }
@@ -110,6 +137,27 @@ const INITIAL_GAME_STATE: GameState = {
         <ng-container footer>
           <app-button variant="silver" (click)="onQuit()"> Quit </app-button>
           <app-button variant="secondary" (click)="onNextTurn()"> Next Round </app-button>
+        </ng-container>
+      </app-dialog>
+    }
+
+    @if (gameStatus() === 'Waiting for Reconnection') {
+      <app-dialog [isShouldShowCollapseButton]="false">
+        <ng-container header>
+          <h3 class="mb-1 text-preset-4 font-bold text-white">Opponent Disconnected</h3>
+          <p class="text-slate-400 text-sm">Waiting for them to reconnect...</p>
+        </ng-container>
+
+        <ng-container content>
+          <div class="flex items-center justify-center py-6">
+            <div class="text-center font-mono text-5xl font-bold text-teal-400 drop-shadow-lg">
+              {{ waitingCountdown() }}s
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container footer>
+          <app-button variant="silver" (click)="onQuit()"> Leave Match </app-button>
         </ng-container>
       </app-dialog>
     }
@@ -131,9 +179,26 @@ const INITIAL_GAME_STATE: GameState = {
           <span class="game-turn-text uppercase text-preset-4 text-slate-300 ml-2">Turn</span>
         </app-button>
 
-        <app-button variant="silver" size="icon" (click)="resetGame()"
-          ><img [src]="iconReset" alt="reset" width="24" height="24"
-        /></app-button>
+        <div class="flex items-center gap-2">
+          @if (isMultiplayer() && playerCount() === 2) {
+            <app-button
+              variant="silver"
+              size="icon"
+              [disabled]="urgeCooldown() > 0"
+              [attr.title]="urgeCooldown() > 0 ? urgeCooldown() + 's' : 'Nudge opponent'"
+              (click)="sendUrge()"
+            >
+              @if (urgeCooldown() > 0) {
+                <span class="text-xs font-mono font-bold">{{ urgeCooldown() }}s</span>
+              } @else {
+                <span>🔔</span>
+              }
+            </app-button>
+          }
+          <app-button variant="silver" size="icon" (click)="resetGame()"
+            ><img [src]="iconReset" alt="reset" width="24" height="24"
+          /></app-button>
+        </div>
       </header>
       <div class="game-board grid grid-cols-3 grid-rows-3 gap-4 sm:gap-6 flex-1 w-full">
         @let boardValue = board();
@@ -173,6 +238,7 @@ export class GamePage implements OnInit, OnDestroy {
   iconO = iconO;
   iconX = iconX;
   iconReset = iconReset;
+  cursorIcon = cursorIcon;
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -181,17 +247,31 @@ export class GamePage implements OnInit, OnDestroy {
 
   private strategySignal = signal<GameModeStrategy | null>(null);
 
+  waitingCountdown = signal(0);
+  urgeCooldown = signal(0);
+  private countdownTimer: ReturnType<typeof setInterval> | undefined;
+  private urgeCooldownTimer: ReturnType<typeof setInterval> | undefined;
+  private readonly mouseMoveHandler = (e: MouseEvent) =>
+    this.strategySignal()?.onMouseMove?.(e.clientX, e.clientY);
+
   private gameState = computed(() => this.strategySignal()?.getGameState()() ?? INITIAL_GAME_STATE);
   playerState = computed(() => this.strategySignal()?.getPlayerState()() ?? { mark: '' as const });
 
   gameStatus = computed(() => this.gameState().gameStatus);
   board = computed(() => this.gameState().board);
   currentPlayer = computed(() => this.gameState().currentPlayer);
-  isGameOver = computed(() => this.gameStatus() !== null);
+  disconnectionExpiration = computed(() => this.gameState().disconnectionExpiration);
+
+  isGameOver = computed(() => {
+    const status = this.gameStatus();
+    return status !== null && status !== 'Waiting for Reconnection';
+  });
 
   isMultiplayer = computed(() => !!this.route.snapshot.paramMap.get('roomId'));
   playerCount = computed(() => this.strategySignal()?.getPlayerCount?.()() ?? 2);
   isWaitingForOpponent = computed(() => this.isMultiplayer() && this.playerCount() < 2);
+  opponentCursor = computed(() => this.strategySignal()?.getOpponentCursor?.()() ?? null);
+  isUrged = computed(() => this.strategySignal()?.getIsUrged?.()() ?? false);
 
   async ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -208,10 +288,41 @@ export class GamePage implements OnInit, OnDestroy {
 
     this.strategySignal.set(strategy);
     await strategy.init();
+
+    if (roomId) {
+      document.addEventListener('mousemove', this.mouseMoveHandler);
+    }
+
+    this.countdownTimer = setInterval(() => {
+      const exp = this.disconnectionExpiration();
+      if (exp && exp > 0 && this.gameStatus() === 'Waiting for Reconnection') {
+        this.waitingCountdown.set(Math.max(0, Math.ceil((exp - Date.now()) / 1000)));
+      }
+    }, 250);
   }
 
   ngOnDestroy() {
+    if (!isPlatformBrowser(this.platformId)) return;
     this.strategySignal()?.destroy();
+    document.removeEventListener('mousemove', this.mouseMoveHandler);
+    if (this.countdownTimer) clearInterval(this.countdownTimer);
+    if (this.urgeCooldownTimer) clearInterval(this.urgeCooldownTimer);
+  }
+
+  sendUrge() {
+    if (this.urgeCooldown() > 0) return;
+    this.strategySignal()?.onUrge?.();
+    this.urgeCooldown.set(10);
+    if (this.urgeCooldownTimer) clearInterval(this.urgeCooldownTimer);
+    this.urgeCooldownTimer = setInterval(() => {
+      this.urgeCooldown.update((v) => {
+        if (v <= 1) {
+          clearInterval(this.urgeCooldownTimer);
+          return 0;
+        }
+        return v - 1;
+      });
+    }, 1000);
   }
 
   onNextTurn() {

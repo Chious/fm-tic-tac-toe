@@ -1,7 +1,7 @@
 import { Signal, signal } from '@angular/core';
 import { Client, Room } from '@colyseus/sdk';
 import { GameState, INITIAL_BOARD, Mark, PlayerState } from '@app/services/game-service';
-import { GameModeStrategy } from './game-mode.strategy';
+import { GameModeStrategy, OpponentCursor } from './game-mode.strategy';
 
 const INITIAL_GAME_STATE: GameState = {
   board: INITIAL_BOARD,
@@ -29,26 +29,41 @@ export class MultiplayerStrategy implements GameModeStrategy {
   private _gameState = signal<GameState>(INITIAL_GAME_STATE);
   private _playerState = signal<PlayerState>(INITIAL_PLAYER_STATE);
   private _playerCount = signal<number>(0);
+  private _opponentCursor = signal<OpponentCursor>(null);
+  private _isUrged = signal(false);
 
   private client = new Client(import.meta.env['NG_APP_COLYSEUS_WS_URL']);
   private room?: Room;
+  private _urgeResetTimer?: ReturnType<typeof setTimeout>;
+  private _lastMouseSent = 0;
 
   constructor(private roomId: string) {}
 
   async init(): Promise<void> {
     try {
       this.room = await this.client.joinById(this.roomId);
+      console.warn(`[MultiplayerStrategy] roomId=${this.roomId} — Colyseus connected`);
 
-      this.room.onMessage('playerState', (state: PlayerState) => {
+      this.room?.onMessage('playerState', (state: PlayerState) => {
         this._playerState.set(state);
       });
 
-      this.room.onStateChange((serverState: any) => {
+      this.room?.onMessage('urge', () => {
+        this._isUrged.set(true);
+        if (this._urgeResetTimer) clearTimeout(this._urgeResetTimer);
+        this._urgeResetTimer = setTimeout(() => this._isUrged.set(false), 3000);
+      });
+
+      this.room?.onMessage('mouseMove', (data: { x: number; y: number }) => {
+        this._opponentCursor.set({ x: data.x, y: data.y });
+      });
+
+      this.room?.onStateChange((serverState: any) => {
         this._gameState.set(this.toGameState(serverState));
         this._playerCount.set(serverState.players.size);
       });
 
-      console.warn(`[MultiplayerStrategy] roomId=${this.roomId} — Colyseus connected`);
+      console.log(`[MultiplayerStrategy] Session ID:`, this.room?.sessionId);
     } catch (e) {
       console.error(`[MultiplayerStrategy] Error joining room ${this.roomId}:`, e);
       // Optional: Handle UI notification or redirect user to home
@@ -56,6 +71,7 @@ export class MultiplayerStrategy implements GameModeStrategy {
   }
 
   destroy(): void {
+    if (this._urgeResetTimer) clearTimeout(this._urgeResetTimer);
     this.room?.leave();
   }
 
@@ -83,6 +99,25 @@ export class MultiplayerStrategy implements GameModeStrategy {
     this.room?.send('reset');
   }
 
+  onUrge(): void {
+    this.room?.send('urge');
+  }
+
+  onMouseMove(x: number, y: number): void {
+    const now = Date.now();
+    if (now - this._lastMouseSent < 50) return;
+    this._lastMouseSent = now;
+    this.room?.send('mouseMove', { x, y });
+  }
+
+  getOpponentCursor(): Signal<OpponentCursor> {
+    return this._opponentCursor.asReadonly();
+  }
+
+  getIsUrged(): Signal<boolean> {
+    return this._isUrged.asReadonly();
+  }
+
   private toGameState(serverState: any): GameState {
     const flat = Array.from(serverState.board) as Mark[];
     const board: Mark[][] = [
@@ -96,6 +131,7 @@ export class MultiplayerStrategy implements GameModeStrategy {
       currentPlayer: serverState.currentPlayer as Mark,
       gameStatus: serverState.gameStatus === '' ? null : (serverState.gameStatus as any),
       gameStats: { X: serverState.statsX, O: serverState.statsO, Tie: serverState.statsTie },
+      disconnectionExpiration: serverState.disconnectionExpiration,
     };
   }
 }
