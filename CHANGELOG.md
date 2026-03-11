@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.5](https://github.com/Chious/fm-tic-tac-toe/compare/v0.0.4...v0.0.5) (2026-03-11)
+
+
+### Features
+
+* **multiplayer:** enhance error handling and user experience ([4f1d1d9](https://github.com/Chious/fm-tic-tac-toe/commit/4f1d1d9113a692ebd2e148cdcde5050668cd389e))
+
+
+### Bug Fixes
+
+* **multiplayer:** enhance offline hint for server disconnect. ([f0383de](https://github.com/Chious/fm-tic-tac-toe/commit/f0383de5c2455fac35ec5a1a5c203cd3177d5f91))
+
 ### [0.0.4](https://github.com/Chious/fm-tic-tac-toe/compare/v0.0.3...v0.0.4) (2026-03-10)
 
 
