@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameService, GameState, INITIAL_BOARD } from '@app/services/game-service';
 import { SinglePlayerStrategy } from './single-player.strategy';
 
-const STORAGE_KEY = 'fm-ttt:single-player:stats';
+const STORAGE_KEY = 'fm-ttt:single-player:v2';
 
 const makeGameState = (overrides: Partial<GameState> = {}): GameState => ({
   board: INITIAL_BOARD,
@@ -53,24 +53,32 @@ describe('SinglePlayerStrategy', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('restores stats from localStorage when playerMark matches', () => {
+    it('restores state from localStorage when playerMark matches', () => {
       gameService.setPlayerMark('X');
-      const stored = { playerMark: 'X', gameStats: { X: 3, O: 1, Tie: 2 } };
+      const stored = { 
+        playerMark: 'X', 
+        gameState: makeGameState({ gameStats: { X: 3, O: 1, Tie: 2 } }) 
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
 
-      const spy = vi.spyOn(gameService, 'restoreStats');
+      const spy = vi.spyOn(gameService, 'restoreGameState');
       const strategy = buildStrategy();
       strategy.init();
 
-      expect(spy).toHaveBeenCalledWith({ X: 3, O: 1, Tie: 2 });
+      expect(spy).toHaveBeenCalled();
+      const calledWithArg = spy.mock.calls[0][0];
+      expect(calledWithArg.gameStats).toEqual({ X: 3, O: 1, Tie: 2 });
     });
 
     it('does not restore stats when playerMark does not match', () => {
       gameService.setPlayerMark('O');
-      const stored = { playerMark: 'X', gameStats: { X: 3, O: 1, Tie: 2 } };
+      const stored = { 
+        playerMark: 'X', 
+        gameState: makeGameState({ gameStats: { X: 3, O: 1, Tie: 2 } }) 
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
 
-      const spy = vi.spyOn(gameService, 'restoreStats');
+      const spy = vi.spyOn(gameService, 'restoreGameState');
       const strategy = buildStrategy();
       strategy.init();
 
@@ -90,7 +98,7 @@ describe('SinglePlayerStrategy', () => {
       expect(raw).not.toBeNull();
       const saved = JSON.parse(raw!);
       expect(saved.playerMark).toBe('X');
-      expect(saved.gameStats).toEqual({ X: 2, O: 0, Tie: 1 });
+      expect(saved.gameState.gameStats).toEqual({ X: 2, O: 0, Tie: 1 });
     });
   });
 

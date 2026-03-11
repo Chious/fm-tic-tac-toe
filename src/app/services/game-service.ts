@@ -1,30 +1,9 @@
-import { Injectable, signal } from '@angular/core';
-import { checkWin } from '@app/utils/game';
+import { Injectable, signal, computed } from '@angular/core';
+import { createActor } from 'xstate';
+import { gameMachine, GameContext, GameState, GameStats, Mark, INITIAL_BOARD, GameStatus } from '@app/machines/game.machine';
 
-export type Mark = 'X' | 'O' | '';
-
-export type GameStatus = 'X' | 'O' | 'draw' | 'Waiting for Reconnection' | 'Opponent Disconnected' | null;
-
-export const INITIAL_BOARD: Mark[][] = [
-  ['', '', ''],
-  ['', '', ''],
-  ['', '', ''],
-];
-
-export type GameStats = {
-  X: number;
-  O: number;
-  Tie: number;
-};
-
-export type GameState = {
-  board: Mark[][];
-  startingPlayer: Mark;
-  currentPlayer: Mark;
-  gameStatus: GameStatus;
-  gameStats: GameStats;
-  disconnectionExpiration?: number;
-};
+export type { GameState, GameStats, Mark, GameStatus };
+export { INITIAL_BOARD };
 
 export type PlayerState = {
   mark: Mark;
@@ -38,23 +17,18 @@ export class GameService {
     mark: 'X',
   });
 
-  private readonly _gameState = signal<GameState>({
-    board: [
-      ['', '', ''],
-      ['', '', ''],
-      ['', '', ''],
-    ],
-    startingPlayer: 'X',
-    currentPlayer: 'X',
-    gameStatus: null,
-    gameStats: {
-      X: 0,
-      O: 0,
-      Tie: 0,
-    },
-  });
+  private actor = createActor(gameMachine).start();
+
+  // We maintain a signal that reflects the actor's context
+  private readonly _gameState = signal<GameContext>(this.actor.getSnapshot().context);
 
   private isProcessing = signal(false);
+
+  constructor() {
+    this.actor.subscribe((state) => {
+      this._gameState.set(state.context);
+    });
+  }
 
   getPlayerState() {
     return this.playerState.asReadonly();
@@ -69,19 +43,22 @@ export class GameService {
   }
 
   setStartingPlayer(mark: Mark) {
-    this._gameState.update((s) => ({
-      ...s,
-      startingPlayer: mark,
-      currentPlayer: mark,
-    }));
+    this.actor.send({ type: 'SET_STARTING_PLAYER', mark });
   }
 
   restoreStats(gameStats: GameStats) {
-    this._gameState.update((s) => ({ ...s, gameStats }));
+    const currentContext = this.actor.getSnapshot().context;
+    this.actor.send({
+      type: 'RESTORE_STATE',
+      state: { ...currentContext, gameStats },
+    });
   }
 
   restoreGameState(state: GameState) {
-    this._gameState.set(state);
+    this.actor.send({
+      type: 'RESTORE_STATE',
+      state,
+    });
   }
 
   setProcessing(value: boolean) {
@@ -89,54 +66,17 @@ export class GameService {
   }
 
   makeMove(row: number, col: number) {
-    const state = this._gameState();
-
-    if (state.gameStatus !== null) return;
     if (this.isProcessing()) return;
-    if (state.board[row][col] !== '') return;
-
-    const newBoard = state.board.map((r, ri) =>
-      r.map((cell, ci) => (ri === row && ci === col ? state.currentPlayer : cell)),
-    );
-
-    const result = checkWin(newBoard);
-    const nextPlayer: Mark = state.currentPlayer === 'X' ? 'O' : 'X';
-
-    this._gameState.update((s) => {
-      const stats = { ...s.gameStats };
-      if (result.gameStatus === 'X') stats.X++;
-      else if (result.gameStatus === 'O') stats.O++;
-      else if (result.gameStatus === 'draw') stats.Tie++;
-
-      return {
-        ...s,
-        board: newBoard,
-        currentPlayer: result.gameStatus ? s.currentPlayer : nextPlayer,
-        gameStatus: result.gameStatus,
-        gameStats: stats,
-      };
-    });
+    this.actor.send({ type: 'MAKE_MOVE', row, col });
   }
 
   nextTurn() {
-    const state = this._gameState();
-    const nextPlayer: Mark = state.currentPlayer === 'X' ? 'O' : 'X';
-    this._gameState.update((s) => ({
-      ...s,
-      board: INITIAL_BOARD,
-      currentPlayer: nextPlayer,
-      gameStatus: null,
-    }));
+    this.actor.send({ type: 'NEXT_TURN' });
     this.isProcessing.set(false);
   }
 
   resetGame() {
-    this._gameState.update((state) => ({
-      ...state,
-      board: INITIAL_BOARD,
-      currentPlayer: state.startingPlayer,
-      gameStatus: null,
-    }));
+    this.actor.send({ type: 'RESET_GAME' });
     this.isProcessing.set(false);
   }
 }
