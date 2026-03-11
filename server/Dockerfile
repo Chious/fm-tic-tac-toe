@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 # Copy package descriptors and install all dependencies (including dev)
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy the rest of the application source code
 COPY . .
